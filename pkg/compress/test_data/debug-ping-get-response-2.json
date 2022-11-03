@@ -1,0 +1,12 @@
+[
+	{
+		"compiler": "gc",
+		"arch": "amd64",
+		"os": "windows"
+	},
+	{
+		"compiler": "gc",
+		"arch": "amd64",
+		"os": "windows"
+	}
+]

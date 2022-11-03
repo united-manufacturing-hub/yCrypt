@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"github.com/awnumar/memguard"
 	"github.com/united-manufacturing-hub/yCrypt/pkg"
+	"github.com/united-manufacturing-hub/yCrypt/pkg/compress"
 	"github.com/united-manufacturing-hub/yCrypt/pkg/signature"
 	"github.com/united-manufacturing-hub/yCrypt/pkg/yubikey"
 	"golang.org/x/crypto/chacha20poly1305"
@@ -25,7 +26,7 @@ type EncryptedData struct {
 	CertificateSerial   big.Int
 }
 
-func EncryptAndSign(
+func SignCompressEncrypt(
 	sessionKeyEncryptionCertificate *x509.Certificate,
 	plaintextSigner pkg.KeyOrCardInterface,
 	plaintext []byte) (encryptedMessage EncryptedData, err error) {
@@ -54,17 +55,25 @@ func EncryptAndSign(
 	}
 	defer lockedBuffer.Destroy()
 
+	// Compress the data
+	compressedData := compress.ZstdCompress(plaintext)
+
+	// Fill plaintext with zeros
+	for i := range plaintext {
+		plaintext[i] = 0
+	}
+
 	// Encrypt data using XChaCha20-Poly1305
 	var aead cipher.AEAD
 	aead, err = chacha20poly1305.NewX(lockedBuffer.Data())
 	if err != nil {
 		return EncryptedData{}, err
 	}
-	nonce := make([]byte, aead.NonceSize(), aead.NonceSize()+len(plaintext)+aead.Overhead())
+	nonce := make([]byte, aead.NonceSize(), aead.NonceSize()+len(compressedData)+aead.Overhead())
 	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
 		return EncryptedData{}, err
 	}
-	ciphertext := aead.Seal(nonce, nonce, plaintext, nil)
+	ciphertext := aead.Seal(nonce, nonce, compressedData, nil)
 
 	// Encrypt session key
 	var encryptedSessionKey []byte
@@ -78,7 +87,7 @@ func EncryptAndSign(
 		}
 
 	default:
-		return EncryptedData{}, errors.New("unknown public key type")
+		return EncryptedData{}, errors.New(fmt.Sprintf("unknown public key type %T", t))
 	}
 
 	return EncryptedData{
@@ -100,7 +109,7 @@ func encryptSessionKeyUsingRSA(pubKey *rsa.PublicKey, sessionKey []byte) (
 	return encryptedSessionKey, err
 }
 
-func DecryptAndVerifySig(
+func DecryptDecompressVerify(
 	ciphertext *EncryptedData,
 	sessionKeyDecrypter pkg.KeyOrCardInterface,
 	signatureValidator pkg.KeyOrCardInterface) (data []byte, err error) {
@@ -164,13 +173,19 @@ func DecryptAndVerifySig(
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("Decrypted data: %s\n", plaintext)
-	// Verify signature
-	err = signature.VerifySigned(signatureValidator, plaintext, ciphertext.Signature)
+
+	// Decompress the data
+	data, err = compress.ZstdDecompress(plaintext)
 	if err != nil {
 		return nil, err
 	}
-	return plaintext, nil
+
+	// Verify signature
+	err = signature.VerifySigned(signatureValidator, data, ciphertext.Signature)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 func decryptSessionKeyUsingRSA(encryptedSessionKey []byte, decrypter *rsa.PrivateKey) (

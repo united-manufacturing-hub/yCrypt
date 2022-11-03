@@ -24,8 +24,10 @@ func Sign(signer pkg.KeyOrCardInterface, data *[]byte) ([]byte, error) {
 			t.Auth)
 	case *rsa.PrivateKey:
 		return signWithPrivateKey(t, data)
+	case *rsa.PublicKey:
+		return nil, fmt.Errorf("public key is not a signer")
 	default:
-		return nil, fmt.Errorf("unknown signer type")
+		return nil, fmt.Errorf("unknown signer type: %T", signer)
 	}
 }
 
@@ -115,7 +117,7 @@ func VerifySigned(validator pkg.KeyOrCardInterface, data, signature []byte) erro
 	case *x509.Certificate:
 		return verifySignedWithCertificate(t, data, signature)
 	}
-	return fmt.Errorf("unknown validator type")
+	return fmt.Errorf("unknown validator type: %T", validator)
 }
 
 func verifySignedWithYubiKey(card *yubikey.SmartCard, slot piv.Slot, data, signature []byte) error {
