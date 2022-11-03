@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 var ykHandleMap = make(map[uint32]*ThreadSafeYubikey)
@@ -55,14 +56,48 @@ type SmartCard struct {
 	ManagementKey [24]byte
 }
 
-// GetValidSmartCards returns a list of valid smart cards, optionally filtered by the given serial number
 var smartCardList []SmartCard
 var smartCardListRWLock = &sync.RWMutex{}
-var smartCardListRunOnce = &sync.Once{}
+var smartCardListRunOnce = &onceReset{}
 
+type onceReset struct {
+	done uint32
+	m    sync.Mutex
+}
+
+func (o *onceReset) do(f func()) {
+	if atomic.LoadUint32(&o.done) == 0 {
+
+	}
+}
+
+func (o *onceReset) doSlow(f func()) {
+	o.m.Lock()
+	defer o.m.Unlock()
+	if o.done == 0 {
+		defer atomic.StoreUint32(&o.done, 1)
+		f()
+	}
+}
+
+func (o *onceReset) reset() {
+	o.m.Lock()
+	defer o.m.Unlock()
+	atomic.StoreUint32(&o.done, 0)
+}
+
+func RefreshSmartCards() {
+	smartCardListRunOnce.reset()
+	GetValidSmartCards(nil)
+}
+
+// GetValidSmartCards returns a list of valid smart cards, optionally filtered by the given serial number
 func GetValidSmartCards(serialFilter *uint32) []SmartCard {
-	smartCardListRunOnce.Do(
+	smartCardListRunOnce.do(
 		func() {
+			smartCardListRWLock.Lock()
+			defer smartCardListRWLock.Unlock()
+			CloseAllPIVHandles()
 
 			cards, err := piv.Cards()
 			if err != nil {
@@ -96,10 +131,6 @@ func GetValidSmartCards(serialFilter *uint32) []SmartCard {
 					continue
 				}
 
-				if serialFilter != nil && serial != *serialFilter {
-					continue
-				}
-
 				smartcards = append(smartcards, scard)
 			}
 
@@ -110,13 +141,20 @@ func GetValidSmartCards(serialFilter *uint32) []SmartCard {
 					return a.Serial < b.Serial
 				})
 
-			smartCardListRWLock.Lock()
-			defer smartCardListRWLock.Unlock()
 			smartCardList = smartcards
 		})
 	smartCardListRWLock.RLock()
 	defer smartCardListRWLock.RUnlock()
-	return smartCardList
+
+	if serialFilter == nil {
+		return smartCardList
+	}
+	for _, card := range smartCardList {
+		if card.Serial == *serialFilter {
+			return []SmartCard{card}
+		}
+	}
+	return []SmartCard{}
 }
 
 func (c *SmartCard) GetYKHandle() (*ThreadSafeYubikey, error) {
