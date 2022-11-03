@@ -67,7 +67,7 @@ type onceReset struct {
 
 func (o *onceReset) do(f func()) {
 	if atomic.LoadUint32(&o.done) == 0 {
-
+		o.doSlow(f)
 	}
 }
 
