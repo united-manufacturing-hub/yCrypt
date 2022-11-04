@@ -42,6 +42,14 @@ linters-settings:
       - math/big
       - github.com/awnumar/memguard
       - bytes
+      - github.com/klauspost/compress
+      - github.com/klauspost/compress/zstd
+      - os
+      - path/filepath
+      - encoding/pem
+      - time
+      - net
+      - math/rand
 
 
   errcheck:

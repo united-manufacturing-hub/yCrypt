@@ -35,6 +35,7 @@ func testEncryptDecryptUsingRSA(t *testing.T, keySize int, s *sync.WaitGroup) {
 
 	sessionKey32Bytes := make([]byte, 32)
 	var err error
+	/* #nosec G404 gosec can't figure out that this is crypto/rand instead of math/rand */
 	_, err = rand.Read(sessionKey32Bytes)
 
 	if err != nil {
@@ -81,6 +82,7 @@ func TestEncryptDecryptYKUsingRSA(t *testing.T) {
 	}
 
 	sessionKey32Bytes := make([]byte, 32)
+	/* #nosec G404 gosec can't figure out that this is crypto/rand instead of math/rand */
 	_, err = rand.Read(sessionKey32Bytes)
 	if err != nil {
 		t.Fatalf("failed to generate random bytes: %v", err)
@@ -200,7 +202,6 @@ func FuzzEncryptDecrypt(f *testing.F) {
 	f.Fuzz(
 		func(t *testing.T, testData []byte) {
 			var testDataCopy []byte
-			testDataCopy = make([]byte, len(testData))
 			copy(testDataCopy, testData)
 			var encryptedData EncryptedData
 			encryptedData, err = SignCompressEncrypt(bundle[0].Certificate, caPrivKey, testData)

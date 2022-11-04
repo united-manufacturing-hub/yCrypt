@@ -101,7 +101,7 @@ func GenerateFakeCAAndCertificates(nCerts uint) (
 		certKeyBundle = append(certKeyBundle, CertKeyBundle{Certificate: userCert, PrivateKey: userPrivKey})
 	}
 
-	return
+	return caCert, caPrivKey, certKeyBundle, nil
 }
 
 func GenerateFakeUserCertificate(ca *x509.Certificate, caPrivKey *rsa.PrivateKey) (
@@ -184,8 +184,7 @@ func GenerateFakeUserCertificate(ca *x509.Certificate, caPrivKey *rsa.PrivateKey
 	if err != nil {
 		return nil, nil, err
 	}
-	var userCert1 *x509.Certificate
-	userCert1 = userCertificates[0]
+	var userCert1 = userCertificates[0]
 	return userCert1, userPrivKey1, nil
 
 }

@@ -1,6 +1,7 @@
 package compress
 
 import (
+	"bytes"
 	"github.com/klauspost/compress"
 	"github.com/klauspost/compress/zstd"
 	"os"
@@ -23,7 +24,7 @@ func TestCompressData(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to decompress data: %s (%v)", err, compressed)
 		}
-		if string(decompressed) != string(data.Data) {
+		if !bytes.Equal(decompressed, data.Data) {
 			t.Fatalf("Decompressed data does not match original data (%v) != (%v)", decompressed, data)
 		}
 	}
@@ -40,7 +41,7 @@ func getTestData() (filedata []File, err error) {
 	if err != nil {
 		return filedata, err
 	}
-	filedata = make([]File, len(files))
+	filedata = make([]File, 0, len(files))
 
 	for _, file := range files {
 		var fd []byte
@@ -102,15 +103,24 @@ func BenchmarkCompressSpeedBestCompression(b *testing.B) {
 		b.Fatal(err)
 	}
 	var e, _ = zstd.NewWriter(nil, zstd.WithEncoderLevel(zstd.SpeedBestCompression))
+	var d, _ = zstd.NewReader(nil)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for _, data := range filesdata {
-			zstdCompressT(data.Data, e)
+			bytesX := zstdCompressT(data.Data, e)
+			var dataD []byte
+			dataD, err = zstdDecompressT(bytesX, d)
+			if err != nil {
+				b.Fatal(err)
+			}
+			if !bytes.Equal(dataD, data.Data) {
+				b.Fatalf("Decompressed data does not match original data (%v) != (%v)", dataD, data)
+			}
 		}
 	}
 }
 
-func zstdCompressT(data []byte, enc *zstd.Encoder) (compressedData []byte) {
+func zstdCompressT(data []byte, enc *zstd.Encoder) []byte {
 	if compress.Estimate(data) <= 0.1 {
 		return append([]byte{0}, data...)
 	}
@@ -119,5 +129,13 @@ func zstdCompressT(data []byte, enc *zstd.Encoder) (compressedData []byte) {
 		return append([]byte{0}, data...)
 	} else {
 		return append([]byte{1}, compressed...)
+	}
+}
+
+func zstdDecompressT(compressedData []byte, dec *zstd.Decoder) (data []byte, err error) {
+	if compressedData[0] == 0 {
+		return compressedData[1:], nil
+	} else {
+		return dec.DecodeAll(compressedData[1:], make([]byte, 0, len(compressedData)))
 	}
 }

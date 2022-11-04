@@ -26,7 +26,7 @@ func TestVerifyPKI(t *testing.T) {
 			t.Errorf("Error encoding CA certificate to PEM: %v", err)
 		}
 		// dump to disk
-		err = os.WriteFile("ca.pem", caPEM, 0644)
+		err = os.WriteFile("ca.pem", caPEM, 0o600)
 		if err != nil {
 			t.Errorf("Error writing CA certificate to disk: %v", err)
 		}
@@ -36,7 +36,7 @@ func TestVerifyPKI(t *testing.T) {
 			t.Errorf("Error encoding user certificate to PEM: %v", err)
 		}
 		// dump to disk
-		err = os.WriteFile("user.pem", userCertPEM, 0644)
+		err = os.WriteFile("user.pem", userCertPEM, 0o600)
 		if err != nil {
 			t.Errorf("Error writing user certificate to disk: %v", err)
 		}

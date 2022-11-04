@@ -18,11 +18,11 @@ import (
 )
 
 type EncryptedData struct {
+	Signer              rsa.PublicKey
 	Ciphertext          []byte
 	Signature           []byte
 	Nonce               []byte
 	EncryptedSessionKey []byte
-	Signer              rsa.PublicKey
 }
 
 func SignCompressEncrypt(
@@ -87,7 +87,7 @@ func SignCompressEncrypt(
 		}
 
 	default:
-		return EncryptedData{}, errors.New(fmt.Sprintf("unknown public key type %T", t))
+		return EncryptedData{}, fmt.Errorf("unknown public key type %T", t)
 	}
 
 	return EncryptedData{
