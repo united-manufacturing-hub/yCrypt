@@ -15,7 +15,6 @@ import (
 	"github.com/united-manufacturing-hub/yCrypt/pkg/yubikey"
 	"golang.org/x/crypto/chacha20poly1305"
 	"io"
-	"math/big"
 )
 
 type EncryptedData struct {
@@ -23,7 +22,7 @@ type EncryptedData struct {
 	Signature           []byte
 	Nonce               []byte
 	EncryptedSessionKey []byte
-	CertificateSerial   big.Int
+	Signer              rsa.PublicKey
 }
 
 func SignCompressEncrypt(
@@ -34,7 +33,8 @@ func SignCompressEncrypt(
 
 	// Sign data
 	var sig []byte
-	sig, err = signature.Sign(plaintextSigner, &plaintext)
+	var signer rsa.PublicKey
+	signer, sig, err = signature.Sign(plaintextSigner, &plaintext)
 	if err != nil {
 		return EncryptedData{}, err
 	}
@@ -95,7 +95,7 @@ func SignCompressEncrypt(
 		Signature:           sig,
 		Nonce:               nonce,
 		EncryptedSessionKey: encryptedSessionKey,
-		CertificateSerial:   *sessionKeyEncryptionCertificate.SerialNumber,
+		Signer:              signer,
 	}, nil
 }
 

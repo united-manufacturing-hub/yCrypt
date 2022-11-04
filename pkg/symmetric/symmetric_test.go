@@ -5,23 +5,23 @@ import (
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
 	"github.com/go-piv/piv-go/piv"
 	"github.com/united-manufacturing-hub/yCrypt/pkg"
+	"github.com/united-manufacturing-hub/yCrypt/pkg/rsagen"
 	"github.com/united-manufacturing-hub/yCrypt/pkg/yubikey"
-	"math/big"
-	"net"
+	mrand "math/rand"
 	"sync"
 	"testing"
-	"time"
 )
 
 func TestEncryptDecryptUsingRSA(t *testing.T) {
 
 	var waitGroup sync.WaitGroup
 	var keysizes = []int{1024, 2048, 4096, 8196}
+	for i := 0; i < 5; i++ {
+		// Add random key sizes to the list
+		keysizes = append(keysizes, mrand.Intn(8196))
+	}
 	waitGroup.Add(len(keysizes))
 	for _, keysize := range keysizes {
 		go testEncryptDecryptUsingRSA(t, keysize, &waitGroup)
@@ -68,7 +68,11 @@ func testEncryptDecryptUsingRSA(t *testing.T, keySize int, s *sync.WaitGroup) {
 }
 
 func TestEncryptDecryptYKUsingRSA(t *testing.T) {
-	smartCard := yubikey.GetValidSmartCards(nil)[0]
+	smartCards := yubikey.GetValidSmartCards(nil)
+	if len(smartCards) == 0 {
+		t.Skip("No smart card found")
+	}
+	smartCard := smartCards[0]
 	var publicKey any
 	var err error
 	publicKey, err = smartCard.GetPublicKey(piv.SlotSignature)
@@ -112,7 +116,11 @@ func TestEncryptDecryptYKUsingRSA(t *testing.T) {
 }
 
 func TestEncryptDataYK(t *testing.T) {
-	smartCard := yubikey.GetValidSmartCards(nil)[0]
+	smartCards := yubikey.GetValidSmartCards(nil)
+	if len(smartCards) == 0 {
+		t.Skip("No smart card found")
+	}
+	smartCard := smartCards[0]
 
 	var cardWithAdditionalData = pkg.SmartCardWithAdditionalData{
 		SmartCard: &smartCard,
@@ -142,7 +150,7 @@ func TestEncryptDataYK(t *testing.T) {
 }
 
 func TestEncryptData(t *testing.T) {
-	caCert, caPrivKey, userCert, userPrivKey, err := getCertAndPKs()
+	_, _, bundle, err := rsagen.GenerateFakeCAAndCertificates(2)
 	if err != nil {
 		t.Fatalf("Failed to generate certificate & private key: %s", err)
 	}
@@ -152,19 +160,20 @@ func TestEncryptData(t *testing.T) {
 	var plainDataCopy = make([]byte, len(plainData))
 	copy(plainDataCopy, plainData)
 	var encryptedData EncryptedData
-	encryptedData, err = SignCompressEncrypt(userCert, caPrivKey, plainData)
+
+	encryptedData, err = SignCompressEncrypt(bundle[0].Certificate, bundle[1].PrivateKey, plainData)
 	if err != nil {
 		t.Fatalf("SignCompressEncrypt() failed: %v", err)
 	}
 	t.Logf("Encrypted data:")
 	t.Logf("\tSessionKey: %v", encryptedData.EncryptedSessionKey)
-	t.Logf("\tCertificateSerial: %v", encryptedData.CertificateSerial)
+	t.Logf("\tSigner Public key: %v", encryptedData.Signer)
 	t.Logf("\tNonce: %v", encryptedData.Nonce)
 	t.Logf("\tCiphertext: %v", encryptedData.Ciphertext)
 	t.Logf("\tSignature: %v", encryptedData.Signature)
 
 	var decryptedData []byte
-	decryptedData, err = DecryptDecompressVerify(&encryptedData, userPrivKey, caCert)
+	decryptedData, err = DecryptDecompressVerify(&encryptedData, bundle[0].PrivateKey, bundle[1].Certificate)
 	if err != nil {
 		t.Fatalf("DecryptAndVerify() failed: %v", err)
 	}
@@ -174,107 +183,8 @@ func TestEncryptData(t *testing.T) {
 	}
 }
 
-func getCertAndPKs() (
-	caCert *x509.Certificate,
-	caPrivKey *rsa.PrivateKey,
-	userCert *x509.Certificate,
-	userPrivKey *rsa.PrivateKey,
-	err error) {
-	ca := &x509.Certificate{
-		SerialNumber: big.NewInt(2019),
-		Subject: pkix.Name{
-			Organization:  []string{"UMH Systems GmbH"},
-			Country:       []string{"DE"},
-			Province:      []string{""},
-			Locality:      []string{"Aachen"},
-			StreetAddress: []string{""},
-			PostalCode:    []string{""},
-		},
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().AddDate(10, 0, 0),
-		IsCA:                  true,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
-		BasicConstraintsValid: true,
-	}
-
-	caPrivKey, err = rsa.GenerateKey(rand.Reader, 4096)
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-
-	caBytes, err := x509.CreateCertificate(rand.Reader, ca, ca, &caPrivKey.PublicKey, caPrivKey)
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-	caPEM := new(bytes.Buffer)
-	err = pem.Encode(
-		caPEM, &pem.Block{
-			Type:  "CERTIFICATE",
-			Bytes: caBytes,
-		})
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-
-	derCert, _ := pem.Decode(caPEM.Bytes())
-
-	caCertificates, err := x509.ParseCertificates(derCert.Bytes)
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-	caCert = caCertificates[0]
-
-	// Begin user cert creation
-	cert := &x509.Certificate{
-		SerialNumber: big.NewInt(1658),
-		Subject: pkix.Name{
-			Organization:  []string{"UMH Systems GmbH"},
-			Country:       []string{"DE"},
-			Province:      []string{""},
-			Locality:      []string{"Aachen"},
-			StreetAddress: []string{""},
-			PostalCode:    []string{""},
-		},
-		IPAddresses:  []net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback},
-		NotBefore:    time.Now(),
-		NotAfter:     time.Now().AddDate(10, 0, 0),
-		SubjectKeyId: []byte{1, 2, 3, 4, 6},
-		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:     x509.KeyUsageDigitalSignature,
-	}
-
-	userPrivKey, err = rsa.GenerateKey(rand.Reader, 4096)
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-	userCertBytes, err := x509.CreateCertificate(rand.Reader, cert, ca, &userPrivKey.PublicKey, userPrivKey)
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-	userCertPEM := new(bytes.Buffer)
-	err = pem.Encode(
-		userCertPEM, &pem.Block{
-			Type:  "CERTIFICATE",
-			Bytes: userCertBytes,
-		})
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-
-	derCertUser, _ := pem.Decode(userCertPEM.Bytes())
-
-	userCertificates, err := x509.ParseCertificates(derCertUser.Bytes)
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-	userCert = userCertificates[0]
-
-	return
-}
-
 func FuzzEncryptDecrypt(f *testing.F) {
-	caCert, caPrivKey, userCert, userPrivKey, err := getCertAndPKs()
+	caCert, caPrivKey, bundle, err := rsagen.GenerateFakeCAAndCertificates(1)
 	if err != nil {
 		f.Fatalf("Failed to generate certificate & private key: %s", err)
 	}
@@ -293,14 +203,14 @@ func FuzzEncryptDecrypt(f *testing.F) {
 			testDataCopy = make([]byte, len(testData))
 			copy(testDataCopy, testData)
 			var encryptedData EncryptedData
-			encryptedData, err = SignCompressEncrypt(userCert, caPrivKey, testData)
+			encryptedData, err = SignCompressEncrypt(bundle[0].Certificate, caPrivKey, testData)
 			if err != nil {
 				t.Fatalf("SignCompressEncrypt() failed: %v", err)
 			}
 			t.Logf("Encrypted data: %#v", encryptedData)
 
 			var decryptedData []byte
-			decryptedData, err = DecryptDecompressVerify(&encryptedData, userPrivKey, caCert)
+			decryptedData, err = DecryptDecompressVerify(&encryptedData, bundle[0].PrivateKey, caCert)
 			if err != nil {
 				t.Fatalf("DecryptAndVerify() failed: %v", err)
 			}

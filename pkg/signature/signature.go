@@ -14,20 +14,32 @@ import (
 
 const SignerHash = crypto.SHA256
 
-func Sign(signer pkg.KeyOrCardInterface, data *[]byte) ([]byte, error) {
+func Sign(signer pkg.KeyOrCardInterface, data *[]byte) (rsa.PublicKey, []byte, error) {
 	switch t := signer.(type) {
 	case pkg.SmartCardWithAdditionalData:
-		return signWithYubikey(
+		sig, err := signWithYubikey(
 			t.SmartCard,
 			t.Slot,
 			data,
 			t.Auth)
+		if err != nil {
+			return rsa.PublicKey{}, nil, err
+		}
+		publicKey, err := t.SmartCard.GetPublicKey(t.Slot)
+		if err != nil {
+			return rsa.PublicKey{}, nil, err
+		}
+		return publicKey.(rsa.PublicKey), sig, nil
 	case *rsa.PrivateKey:
-		return signWithPrivateKey(t, data)
+		sig, err := signWithPrivateKey(t, data)
+		if err != nil {
+			return rsa.PublicKey{}, nil, err
+		}
+		return t.PublicKey, sig, nil
 	case *rsa.PublicKey:
-		return nil, fmt.Errorf("public key is not a signer")
+		return rsa.PublicKey{}, nil, fmt.Errorf("public key is not a signer")
 	default:
-		return nil, fmt.Errorf("unknown signer type: %T", signer)
+		return rsa.PublicKey{}, nil, fmt.Errorf("unknown signer type: %T", signer)
 	}
 }
 
@@ -149,15 +161,4 @@ func verifySignedWithCertificate(certificate *x509.Certificate, data, signature 
 		return fmt.Errorf("unknown key type")
 	}
 	return nil
-}
-
-func VerifyPKI(signerCertificate, caCert *x509.Certificate) (chain [][]*x509.Certificate, err error) {
-	opts := x509.VerifyOptions{
-		Roots:         x509.NewCertPool(),
-		Intermediates: x509.NewCertPool(),
-		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
-	}
-	opts.Roots.AddCert(caCert)
-
-	return signerCertificate.Verify(opts)
 }

@@ -30,7 +30,8 @@ func TestSignWithYubikey(t *testing.T) {
 	t.Logf("Signing with Yubikey: %v", cardWithData)
 
 	var signature []byte
-	signature, err = Sign(
+	var signer rsa.PublicKey
+	signer, signature, err = Sign(
 		cardWithData,
 		&randomDataToSign)
 	if err != nil {
@@ -38,6 +39,7 @@ func TestSignWithYubikey(t *testing.T) {
 	}
 
 	t.Logf("Signature: %v", signature)
+	t.Logf("Signer: %v", signer)
 }
 
 func TestSignWithPrivateKey(t *testing.T) {
@@ -67,13 +69,15 @@ func testSignWithPrivateKey(t *testing.T, keySize int, s *sync.WaitGroup) {
 	}
 
 	var signature []byte
-	signature, err = Sign(privateKey, &randomDataToSign)
+	var signer rsa.PublicKey
+	signer, signature, err = Sign(privateKey, &randomDataToSign)
 	if err != nil {
 		t.Logf("Error signing with privatekey: %v", err)
 		panic(err)
 	}
 
 	t.Logf("Signature: %v", signature)
+	t.Logf("Signer: %v", signer)
 
 }
 
