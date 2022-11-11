@@ -25,7 +25,8 @@ type EncryptedData struct {
 	EncryptedSessionKey []byte
 }
 
-// SignCompressEncrypt compresses the data using zstd, encrypts the data using XChaCha20-Poly1305 and signs the data using RSA.
+// SignCompressEncrypt compresses the data using zstd,
+// encrypts the data using XChaCha20-Poly1305 and signs the data using RSA.
 func SignCompressEncrypt(
 	sessionKeyEncryptionCertificate *x509.Certificate,
 	plaintextSigner pkg.KeyOrCardInterface,
@@ -111,7 +112,8 @@ func encryptSessionKeyUsingRSA(pubKey *rsa.PublicKey, sessionKey []byte) (
 	return encryptedSessionKey, err
 }
 
-// DecryptDecompressVerify decrypts the data using XChaCha20-Poly1305, decompresses the data using zstd and verifies the signature using RSA.
+// DecryptDecompressVerify decrypts the data using XChaCha20-Poly1305,
+// decompresses the data using zstd and verifies the signature using RSA.
 func DecryptDecompressVerify(
 	ciphertext *EncryptedData,
 	sessionKeyDecrypter pkg.KeyOrCardInterface,

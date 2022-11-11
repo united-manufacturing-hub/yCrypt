@@ -44,7 +44,7 @@ func GenerateFakeCAAndCertificates(nCerts uint) (
 	certKeyBundle []CertKeyBundle,
 	err error) {
 
-	caCert, caPrivKey, err = GenerateSelfSignedCertificate(big.NewInt(2019), subjectCA, keyUsageCA, extKeyUsageCA)
+	caCert, caPrivKey, err = GenerateSelfSignedCertificate(big.NewInt(2019), &subjectCA, keyUsageCA, extKeyUsageCA)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -78,7 +78,7 @@ func GenerateFakeUserCertificate(ca *x509.Certificate, caPrivKey *rsa.PrivateKey
 	var certificateRequest *x509.CertificateRequest
 
 	certificateRequest, err = GenerateCSR(
-		userPrivKey, pkix.Name{
+		userPrivKey, &pkix.Name{
 			Country:            []string{"DE"},
 			Organization:       []string{"UMH Systems GmbH"},
 			OrganizationalUnit: []string{"IT"},
@@ -109,13 +109,13 @@ func GenerateFakeUserCertificate(ca *x509.Certificate, caPrivKey *rsa.PrivateKey
 // GenerateSelfSignedCertificate generates a self-signed certificate, with CA flag set to true
 func GenerateSelfSignedCertificate(
 	serialNUmber *big.Int,
-	subject pkix.Name,
+	subject *pkix.Name,
 	keyUsage x509.KeyUsage,
 	extKeyUsage []x509.ExtKeyUsage) (cert *x509.Certificate, key *rsa.PrivateKey, err error) {
 	caCertificate := &x509.Certificate{
 		SerialNumber:          serialNUmber,
-		Subject:               subject,
-		Issuer:                subject,
+		Subject:               *subject,
+		Issuer:                *subject,
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().AddDate(10, 0, 0),
 		IsCA:                  true,
@@ -135,6 +135,10 @@ func GenerateSelfSignedCertificate(
 		caCertificate,
 		&key.PublicKey,
 		key)
+	if err != nil {
+		return cert, key, err
+
+	}
 
 	var caCertificates []*x509.Certificate
 	caCertificates, err = encoding.CertBytesToX509Certificate(caCertBytes)
@@ -151,9 +155,9 @@ func GenerateSelfSignedCertificate(
 }
 
 // GenerateCSR generates a certificate signing request
-func GenerateCSR(privateKey *rsa.PrivateKey, subject pkix.Name) (csr *x509.CertificateRequest, err error) {
+func GenerateCSR(privateKey *rsa.PrivateKey, subject *pkix.Name) (csr *x509.CertificateRequest, err error) {
 	template := x509.CertificateRequest{
-		Subject: subject,
+		Subject: *subject,
 	}
 
 	csrBytes, err := x509.CreateCertificateRequest(rand.Reader, &template, privateKey)
