@@ -25,6 +25,7 @@ type EncryptedData struct {
 	EncryptedSessionKey []byte
 }
 
+// SignCompressEncrypt compresses the data using zstd, encrypts the data using XChaCha20-Poly1305 and signs the data using RSA.
 func SignCompressEncrypt(
 	sessionKeyEncryptionCertificate *x509.Certificate,
 	plaintextSigner pkg.KeyOrCardInterface,
@@ -99,6 +100,7 @@ func SignCompressEncrypt(
 	}, nil
 }
 
+// encryptSessionKeyUsingRSA encrypts the session key using RSA.
 func encryptSessionKeyUsingRSA(pubKey *rsa.PublicKey, sessionKey []byte) (
 	encryptedSessionKey []byte,
 	err error) {
@@ -109,6 +111,7 @@ func encryptSessionKeyUsingRSA(pubKey *rsa.PublicKey, sessionKey []byte) (
 	return encryptedSessionKey, err
 }
 
+// DecryptDecompressVerify decrypts the data using XChaCha20-Poly1305, decompresses the data using zstd and verifies the signature using RSA.
 func DecryptDecompressVerify(
 	ciphertext *EncryptedData,
 	sessionKeyDecrypter pkg.KeyOrCardInterface,
@@ -188,6 +191,7 @@ func DecryptDecompressVerify(
 	return data, nil
 }
 
+// decryptSessionKeyUsingRSA decrypts the session key using an RSA private key.
 func decryptSessionKeyUsingRSA(encryptedSessionKey []byte, decrypter *rsa.PrivateKey) (
 	sessionKey []byte,
 	err error) {
@@ -197,6 +201,7 @@ func decryptSessionKeyUsingRSA(encryptedSessionKey []byte, decrypter *rsa.Privat
 	return sessionKey, err
 }
 
+// decryptSessionKeyUsingRSAYK decrypts the session key using a yubikey crypto.Decrypter interface.
 func decryptSessionKeyUsingRSAYK(encryptedSessionKey []byte, decrypter crypto.Decrypter) (
 	sessionKey []byte,
 	err error) {

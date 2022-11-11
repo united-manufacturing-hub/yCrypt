@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// VerifyPKI verifies the PKI certificate chain.
 func VerifyPKI(
 	rootCaCertificate *x509.Certificate,
 	userCertificate *x509.Certificate,

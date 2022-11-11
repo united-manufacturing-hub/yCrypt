@@ -5,10 +5,9 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/pem"
+	"errors"
 	"github.com/united-manufacturing-hub/yCrypt/pkg/encoding"
 	"math/big"
-	"net"
 	"time"
 )
 
@@ -38,63 +37,24 @@ var extKeyUsageCA = []x509.ExtKeyUsage{
 	x509.ExtKeyUsageOCSPSigning,
 }
 
-var keyUsageUser = x509.KeyUsageDigitalSignature | x509.KeyUsageContentCommitment |
-	x509.KeyUsageKeyEncipherment | x509.KeyUsageDataEncipherment | x509.KeyUsageKeyAgreement |
-	x509.KeyUsageCertSign | x509.KeyUsageCRLSign
-
-var extKeyUsageUser = []x509.ExtKeyUsage{
-	x509.ExtKeyUsageClientAuth,
-	x509.ExtKeyUsageServerAuth,
-	x509.ExtKeyUsageTimeStamping,
-	x509.ExtKeyUsageOCSPSigning,
-}
-
+// GenerateFakeCAAndCertificates generates a fake CA certificate and nCerts certificates signed by the CA
 func GenerateFakeCAAndCertificates(nCerts uint) (
 	caCert *x509.Certificate,
 	caPrivKey *rsa.PrivateKey,
 	certKeyBundle []CertKeyBundle,
 	err error) {
-	ca := &x509.Certificate{
-		SerialNumber:          big.NewInt(2019),
-		Subject:               subjectCA,
-		Issuer:                subjectCA,
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().AddDate(10, 0, 0),
-		IsCA:                  true,
-		ExtKeyUsage:           extKeyUsageCA,
-		KeyUsage:              keyUsageCA,
-		BasicConstraintsValid: true,
-	}
 
-	caPrivKey, err = rsa.GenerateKey(rand.Reader, 4096)
+	caCert, caPrivKey, err = GenerateSelfSignedCertificate(big.NewInt(2019), subjectCA, keyUsageCA, extKeyUsageCA)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-
-	caBytes, err := x509.CreateCertificate(rand.Reader, ca, ca, &caPrivKey.PublicKey, caPrivKey)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	var caPEM []byte
-	caPEM, err = encoding.EncodeCertificateToPEM(caBytes)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	derCert, _ := pem.Decode(caPEM)
-
-	caCertificates, err := x509.ParseCertificates(derCert.Bytes)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	caCert = caCertificates[0]
 
 	certKeyBundle = make([]CertKeyBundle, 0, nCerts)
 
 	for i := uint(0); i < nCerts; i++ {
 		var userPrivKey *rsa.PrivateKey
 		var userCert *x509.Certificate
-		userCert, userPrivKey, err = GenerateFakeUserCertificate(ca, caPrivKey)
+		userCert, userPrivKey, err = GenerateFakeUserCertificate(caCert, caPrivKey)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -104,18 +64,21 @@ func GenerateFakeCAAndCertificates(nCerts uint) (
 	return caCert, caPrivKey, certKeyBundle, nil
 }
 
+// GenerateFakeUserCertificate generates a fake user certificate signed by the CA
 func GenerateFakeUserCertificate(ca *x509.Certificate, caPrivKey *rsa.PrivateKey) (
 	*x509.Certificate,
 	*rsa.PrivateKey,
 	error) {
 	var err error
-	var userPrivKey1 *rsa.PrivateKey
-	userPrivKey1, err = rsa.GenerateKey(rand.Reader, 4096)
+	var userPrivKey *rsa.PrivateKey
+	userPrivKey, err = rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
 		return nil, nil, err
 	}
-	template := x509.CertificateRequest{
-		Subject: pkix.Name{
+	var certificateRequest *x509.CertificateRequest
+
+	certificateRequest, err = GenerateCSR(
+		userPrivKey, pkix.Name{
 			Country:            []string{"DE"},
 			Organization:       []string{"UMH Systems GmbH"},
 			OrganizationalUnit: []string{"IT"},
@@ -124,67 +87,143 @@ func GenerateFakeUserCertificate(ca *x509.Certificate, caPrivKey *rsa.PrivateKey
 			StreetAddress:      []string{"Vaalser Straße 460"},
 			PostalCode:         []string{"52074"},
 			CommonName:         "UMH-TEST-TECHNICIAN-CERTIFICATE-DO-NOT-USE",
-		},
-	}
-
-	csr, err := x509.CreateCertificateRequest(rand.Reader, &template, userPrivKey1)
+		})
 	if err != nil {
 		return nil, nil, err
 	}
-
-	certificateRequest, err := x509.ParseCertificateRequest(csr)
-	if err != nil {
-		return nil, nil, err
-	}
-	err = certificateRequest.CheckSignature()
-	if err != nil {
-		return nil, nil, err
-	}
-
 	randomBigInt, err := rand.Int(rand.Reader, big.NewInt(1000000000000000000))
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// Begin user cert creation
-
-	cert := &x509.Certificate{
-		Signature:          certificateRequest.Signature,
-		SignatureAlgorithm: certificateRequest.SignatureAlgorithm,
-
-		PublicKeyAlgorithm: certificateRequest.PublicKeyAlgorithm,
-		PublicKey:          certificateRequest.PublicKey,
-
-		SerialNumber: randomBigInt,
-		Subject:      certificateRequest.Subject,
-		IPAddresses:  []net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback},
-		NotBefore:    time.Now(),
-		NotAfter:     time.Now().AddDate(10, 0, 0),
-		SubjectKeyId: randomBigInt.Bytes(),
-		ExtKeyUsage:  extKeyUsageUser,
-		KeyUsage:     keyUsageUser,
-		Issuer:       ca.Subject,
-	}
-
-	certificate, err := x509.CreateCertificate(rand.Reader, cert, ca, &userPrivKey1.PublicKey, caPrivKey)
+	var certificate *x509.Certificate
+	certificate, err = SignCSR(ca, caPrivKey, userPrivKey.PublicKey, certificateRequest, randomBigInt, false)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	var userPEM []byte
-	userPEM, err = encoding.EncodeCertificateToPEM(certificate)
-	if err != nil {
-		return nil, nil, nil
+	return certificate, userPrivKey, nil
+
+}
+
+// GenerateSelfSignedCertificate generates a self-signed certificate, with CA flag set to true
+func GenerateSelfSignedCertificate(
+	serialNUmber *big.Int,
+	subject pkix.Name,
+	keyUsage x509.KeyUsage,
+	extKeyUsage []x509.ExtKeyUsage) (cert *x509.Certificate, key *rsa.PrivateKey, err error) {
+	caCertificate := &x509.Certificate{
+		SerialNumber:          serialNUmber,
+		Subject:               subject,
+		Issuer:                subject,
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().AddDate(10, 0, 0),
+		IsCA:                  true,
+		ExtKeyUsage:           extKeyUsage,
+		KeyUsage:              keyUsage,
+		BasicConstraintsValid: true,
 	}
 
-	var derCert *pem.Block
-	derCert, _ = pem.Decode(userPEM)
-
-	userCertificates, err := x509.ParseCertificates(derCert.Bytes)
+	key, err = rsa.GenerateKey(rand.Reader, 8192)
 	if err != nil {
-		return nil, nil, err
+		return cert, key, err
 	}
-	var userCert1 = userCertificates[0]
-	return userCert1, userPrivKey1, nil
+	var caCertBytes []byte
+	caCertBytes, err = x509.CreateCertificate(
+		rand.Reader,
+		caCertificate,
+		caCertificate,
+		&key.PublicKey,
+		key)
 
+	var caCertificates []*x509.Certificate
+	caCertificates, err = encoding.CertBytesToX509Certificate(caCertBytes)
+	if err != nil {
+		return cert, key, err
+	}
+	if len(caCertificates) != 1 {
+		return cert, key, errors.New("len(caCertificates) != 1")
+	}
+
+	cert = caCertificates[0]
+
+	return cert, key, nil
+}
+
+// GenerateCSR generates a certificate signing request
+func GenerateCSR(privateKey *rsa.PrivateKey, subject pkix.Name) (csr *x509.CertificateRequest, err error) {
+	template := x509.CertificateRequest{
+		Subject: subject,
+	}
+
+	csrBytes, err := x509.CreateCertificateRequest(rand.Reader, &template, privateKey)
+	if err != nil {
+		return csr, err
+	}
+
+	csr, err = x509.ParseCertificateRequest(csrBytes)
+	if err != nil {
+		return csr, err
+	}
+	err = csr.CheckSignature()
+	return csr, err
+}
+
+// SignCSR signs a certificate signing request
+func SignCSR(
+	caCert *x509.Certificate,
+	caPrivKey *rsa.PrivateKey,
+	userPublicKey rsa.PublicKey,
+	csr *x509.CertificateRequest,
+	serialNumber *big.Int, isIntermediateCA bool) (cert *x509.Certificate, err error) {
+
+	certificate := &x509.Certificate{
+		Signature:          csr.Signature,
+		SignatureAlgorithm: csr.SignatureAlgorithm,
+
+		PublicKey:          csr.PublicKey,
+		PublicKeyAlgorithm: csr.PublicKeyAlgorithm,
+
+		SerialNumber: serialNumber,
+		Subject:      csr.Subject,
+
+		NotBefore: time.Now(),
+		NotAfter:  time.Now().AddDate(0, 1, 0),
+
+		SubjectKeyId: serialNumber.Bytes(),
+		ExtKeyUsage: []x509.ExtKeyUsage{
+			x509.ExtKeyUsageClientAuth,
+			x509.ExtKeyUsageServerAuth,
+		},
+		KeyUsage: x509.KeyUsageDigitalSignature |
+			x509.KeyUsageKeyEncipherment |
+			x509.KeyUsageKeyAgreement |
+			x509.KeyUsageDataEncipherment |
+			x509.KeyUsageContentCommitment,
+		IsCA:                  isIntermediateCA,
+		BasicConstraintsValid: true,
+		AuthorityKeyId:        caCert.SubjectKeyId,
+	}
+	if isIntermediateCA {
+		certificate.KeyUsage |= x509.KeyUsageCertSign
+		certificate.KeyUsage |= x509.KeyUsageCRLSign
+	}
+
+	certBytes, err := x509.CreateCertificate(rand.Reader, certificate, caCert, &userPublicKey, caPrivKey)
+
+	if err != nil {
+		return cert, err
+	}
+
+	var certificates []*x509.Certificate
+	certificates, err = encoding.CertBytesToX509Certificate(certBytes)
+	if err != nil {
+		return cert, err
+	}
+	if len(certificates) != 1 {
+		return cert, errors.New("len(certificates) != 1")
+	}
+
+	cert = certificates[0]
+	return cert, nil
 }

@@ -14,6 +14,7 @@ import (
 
 const SignerHash = crypto.SHA256
 
+// Sign signs the data with the given key or card.
 func Sign(signer pkg.KeyOrCardInterface, data *[]byte) (rsa.PublicKey, []byte, error) {
 	switch t := signer.(type) {
 	case pkg.SmartCardWithAdditionalData:
@@ -43,6 +44,7 @@ func Sign(signer pkg.KeyOrCardInterface, data *[]byte) (rsa.PublicKey, []byte, e
 	}
 }
 
+// signWithYubikey signs the data with a yubikey.
 func signWithYubikey(smartCard *yubikey.SmartCard, slot piv.Slot, data *[]byte, auth piv.KeyAuth) (
 	signature []byte,
 	err error) {
@@ -100,6 +102,7 @@ func signWithYubikey(smartCard *yubikey.SmartCard, slot piv.Slot, data *[]byte, 
 	}
 }
 
+// signWithPrivateKey signs the data with a private key.
 func signWithPrivateKey(privKey *rsa.PrivateKey, data *[]byte) (
 	signature []byte,
 	err error) {
@@ -122,6 +125,7 @@ func signWithPrivateKey(privKey *rsa.PrivateKey, data *[]byte) (
 	return signature, nil
 }
 
+// VerifySigned verifies the signature of the data with the given key or card.
 func VerifySigned(validator pkg.KeyOrCardInterface, data, signature []byte) error {
 	switch t := validator.(type) {
 	case pkg.SmartCardWithAdditionalData:
@@ -132,6 +136,7 @@ func VerifySigned(validator pkg.KeyOrCardInterface, data, signature []byte) erro
 	return fmt.Errorf("unknown validator type: %T", validator)
 }
 
+// verifySignedWithYubiKey verifies the signature of the data with a yubikey.
 func verifySignedWithYubiKey(card *yubikey.SmartCard, slot piv.Slot, data, signature []byte) error {
 	fmt.Printf("Retrieving certificate from slot %v\n", slot)
 	certificate, err := card.GetCertificate(slot)
@@ -146,6 +151,7 @@ func verifySignedWithYubiKey(card *yubikey.SmartCard, slot piv.Slot, data, signa
 	return nil
 }
 
+// verifySignedWithCertificate verifies the signature of the data with a certificate.
 func verifySignedWithCertificate(certificate *x509.Certificate, data, signature []byte) (err error) {
 	hash := SignerHash.New()
 	hash.Write(data)
