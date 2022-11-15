@@ -6,8 +6,11 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"errors"
+	"github.com/united-manufacturing-hub/oid/pkg/oid"
+	certificates "github.com/united-manufacturing-hub/oid/pkg/oid/100_managementConsole/100_certificates"
 	"github.com/united-manufacturing-hub/yCrypt/pkg/encoding"
 	"math/big"
+	"sync"
 	"time"
 )
 
@@ -44,28 +47,46 @@ func GenerateFakeCAAndCertificates(nCerts uint) (
 	certKeyBundle []CertKeyBundle,
 	err error) {
 
-	caCert, caPrivKey, err = GenerateSelfSignedCertificate(big.NewInt(2019), &subjectCA, keyUsageCA, extKeyUsageCA)
+	caCert, caPrivKey, err = GenerateSelfSignedCertificate(
+		big.NewInt(2019),
+		&subjectCA,
+		keyUsageCA,
+		extKeyUsageCA,
+		[]pkix.Extension{oid.ToPkixExtension(certificates.GetCaCertificateAsn10id(), true, []byte{0x01})})
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
 	certKeyBundle = make([]CertKeyBundle, 0, nCerts)
 
+	var wg sync.WaitGroup
+	wg.Add(int(nCerts))
+
 	for i := uint(0); i < nCerts; i++ {
-		var userPrivKey *rsa.PrivateKey
-		var userCert *x509.Certificate
-		userCert, userPrivKey, err = GenerateFakeUserCertificate(caCert, caPrivKey)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		certKeyBundle = append(certKeyBundle, CertKeyBundle{Certificate: userCert, PrivateKey: userPrivKey})
+		go func(waitGroup *sync.WaitGroup) {
+			var userPrivKey *rsa.PrivateKey
+			var userCert *x509.Certificate
+			// random bool
+			var randData [1]byte
+			_, err = rand.Read(randData[:])
+			if err != nil {
+				return
+			}
+			userCert, userPrivKey, err = GenerateFakeUserOrDeviceCertificate(caCert, caPrivKey, randData[0]%2 == 0)
+			if err != nil {
+				return
+			}
+			certKeyBundle = append(certKeyBundle, CertKeyBundle{Certificate: userCert, PrivateKey: userPrivKey})
+			waitGroup.Done()
+		}(&wg)
 	}
+	wg.Wait()
 
 	return caCert, caPrivKey, certKeyBundle, nil
 }
 
-// GenerateFakeUserCertificate generates a fake user certificate signed by the CA
-func GenerateFakeUserCertificate(ca *x509.Certificate, caPrivKey *rsa.PrivateKey) (
+// GenerateFakeUserOrDeviceCertificate generates a fake user certificate signed by the CA
+func GenerateFakeUserOrDeviceCertificate(ca *x509.Certificate, caPrivKey *rsa.PrivateKey, isDeviceCertificate bool) (
 	*x509.Certificate,
 	*rsa.PrivateKey,
 	error) {
@@ -77,6 +98,13 @@ func GenerateFakeUserCertificate(ca *x509.Certificate, caPrivKey *rsa.PrivateKey
 	}
 	var certificateRequest *x509.CertificateRequest
 
+	var cn string
+	if isDeviceCertificate {
+		cn = "UMH-TEST-DEVICE-DO-NOT-USE"
+	} else {
+		cn = "UMH-TEST-USER-DO-NOT-USE"
+	}
+
 	certificateRequest, err = GenerateCSR(
 		userPrivKey, &pkix.Name{
 			Country:            []string{"DE"},
@@ -86,8 +114,20 @@ func GenerateFakeUserCertificate(ca *x509.Certificate, caPrivKey *rsa.PrivateKey
 			Province:           []string{"NRW"},
 			StreetAddress:      []string{"Vaalser Straße 460"},
 			PostalCode:         []string{"52074"},
-			CommonName:         "UMH-TEST-TECHNICIAN-CERTIFICATE-DO-NOT-USE",
+			CommonName:         cn,
 		})
+
+	if isDeviceCertificate {
+		certificateRequest.Extensions = append(
+			certificateRequest.Extensions,
+			oid.ToPkixExtension(certificates.GetDeviceCertificateAsn10id(), true, []byte{0x01}))
+
+	} else {
+		certificateRequest.Extensions = append(
+			certificateRequest.Extensions,
+			oid.ToPkixExtension(certificates.GetTechCertificateAsn10id(), true, []byte{0x01}))
+	}
+
 	if err != nil {
 		return nil, nil, err
 	}
@@ -111,7 +151,9 @@ func GenerateSelfSignedCertificate(
 	serialNUmber *big.Int,
 	subject *pkix.Name,
 	keyUsage x509.KeyUsage,
-	extKeyUsage []x509.ExtKeyUsage) (cert *x509.Certificate, key *rsa.PrivateKey, err error) {
+	extKeyUsage []x509.ExtKeyUsage,
+	extensions []pkix.Extension,
+) (cert *x509.Certificate, key *rsa.PrivateKey, err error) {
 	caCertificate := &x509.Certificate{
 		SerialNumber:          serialNUmber,
 		Subject:               *subject,
@@ -123,6 +165,7 @@ func GenerateSelfSignedCertificate(
 		KeyUsage:              keyUsage,
 		BasicConstraintsValid: true,
 	}
+	caCertificate.ExtraExtensions = extensions
 
 	key, err = rsa.GenerateKey(rand.Reader, 8192)
 	if err != nil {

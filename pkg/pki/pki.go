@@ -2,7 +2,8 @@ package pki
 
 import (
 	"crypto/x509"
-	"fmt"
+	"crypto/x509/pkix"
+	"encoding/asn1"
 	"time"
 )
 
@@ -10,7 +11,9 @@ import (
 func VerifyPKI(
 	rootCaCertificate *x509.Certificate,
 	userCertificate *x509.Certificate,
-	chain []*x509.Certificate) (bool, error) {
+	chain []*x509.Certificate,
+	additionalExtensions []asn1.ObjectIdentifier,
+) (bool, error) {
 
 	/*
 		Verify attempts to verify c by building one or more chains from c to a certificate in opts.Roots,
@@ -18,6 +21,15 @@ func VerifyPKI(
 		If successful, it returns one or more chains where the first element of the chain is c and
 		the last element is from opts.Roots.
 	*/
+
+	removeAllowedCriticalExtensions(rootCaCertificate, additionalExtensions)
+	removeAllowedCriticalExtensions(userCertificate, additionalExtensions)
+
+	var newChain []*x509.Certificate
+	for _, cert := range chain {
+		removeAllowedCriticalExtensions(cert, additionalExtensions)
+		newChain = append(newChain, cert)
+	}
 
 	roots := x509.NewCertPool()
 	roots.AddCert(rootCaCertificate)
@@ -38,12 +50,49 @@ func VerifyPKI(
 		return false, err
 	}
 
-	for _, validatorChain := range verify {
-		fmt.Printf("Chain:\n")
-		for _, cert := range validatorChain {
-			fmt.Printf("\tCertificate: %s [%s]\n", cert.Subject, cert.SerialNumber)
+	return len(verify) > 0, nil
+}
+
+func removeAllowedCriticalExtensions(
+	cert *x509.Certificate,
+	allowedExtensions []asn1.ObjectIdentifier) *x509.Certificate {
+
+	var unhandledExtensions []pkix.Extension
+
+	for _, extension := range cert.Extensions {
+		if !extension.Critical {
+			unhandledExtensions = append(unhandledExtensions, extension)
+			continue
+		}
+		var found bool
+		for _, additionalExtension := range allowedExtensions {
+			if extension.Id.Equal(additionalExtension) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			unhandledExtensions = append(unhandledExtensions, extension)
 		}
 	}
+	cert.Extensions = unhandledExtensions
 
-	return len(verify) > 0, nil
+	// Cleanup the unhandled critical extensions
+
+	var unhandledCriticalExtensions []asn1.ObjectIdentifier
+	for _, unhandledCriticalExtension := range cert.UnhandledCriticalExtensions {
+		var found bool
+		for _, additionalExtension := range allowedExtensions {
+			if unhandledCriticalExtension.Equal(additionalExtension) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			unhandledCriticalExtensions = append(unhandledCriticalExtensions, unhandledCriticalExtension)
+		}
+	}
+	cert.UnhandledCriticalExtensions = unhandledCriticalExtensions
+
+	return cert
 }
