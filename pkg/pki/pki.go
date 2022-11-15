@@ -25,11 +25,12 @@ func VerifyPKI(
 	removeAllowedCriticalExtensions(rootCaCertificate, additionalExtensions)
 	removeAllowedCriticalExtensions(userCertificate, additionalExtensions)
 
-	var newChain []*x509.Certificate
+	newChain := make([]*x509.Certificate, 0, len(chain))
 	for _, cert := range chain {
 		removeAllowedCriticalExtensions(cert, additionalExtensions)
 		newChain = append(newChain, cert)
 	}
+	chain = newChain
 
 	roots := x509.NewCertPool()
 	roots.AddCert(rootCaCertificate)
@@ -55,7 +56,7 @@ func VerifyPKI(
 
 func removeAllowedCriticalExtensions(
 	cert *x509.Certificate,
-	allowedExtensions []asn1.ObjectIdentifier) *x509.Certificate {
+	allowedExtensions []asn1.ObjectIdentifier) {
 
 	var unhandledExtensions []pkix.Extension
 
@@ -94,5 +95,4 @@ func removeAllowedCriticalExtensions(
 	}
 	cert.UnhandledCriticalExtensions = unhandledCriticalExtensions
 
-	return cert
 }

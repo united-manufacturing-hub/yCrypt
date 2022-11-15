@@ -50,6 +50,7 @@ linters-settings:
       - time
       - net
       - math/rand
+      - github.com/united-manufacturing-hub/oid/**/*
 
 
   errcheck:

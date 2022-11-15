@@ -45,7 +45,7 @@ func TestVerifyPKI(t *testing.T) {
 	// dump to disk
 	err = os.WriteFile(fmt.Sprintf("testdata/%s.key", caCert.SerialNumber.String()), caPrivKeyPEM, 0o600)
 	if err != nil {
-
+		t.Errorf("Error writing CA private key to disk: %v", err)
 	}
 
 	path := filepath.Join("testdata", caCert.SerialNumber.String())

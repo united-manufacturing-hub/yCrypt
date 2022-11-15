@@ -262,15 +262,15 @@ func SignCSR(
 		return cert, err
 	}
 
-	var certificates []*x509.Certificate
-	certificates, err = encoding.CertBytesToX509Certificate(certBytes)
+	var certs []*x509.Certificate
+	certs, err = encoding.CertBytesToX509Certificate(certBytes)
 	if err != nil {
 		return cert, err
 	}
-	if len(certificates) != 1 {
-		return cert, errors.New("len(certificates) != 1")
+	if len(certs) != 1 {
+		return cert, errors.New("len(certs) != 1")
 	}
 
-	cert = certificates[0]
+	cert = certs[0]
 	return cert, nil
 }
