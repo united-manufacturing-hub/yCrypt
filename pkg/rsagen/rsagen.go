@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"errors"
+	"fmt"
 	"github.com/united-manufacturing-hub/oid/pkg/oid"
 	certificates "github.com/united-manufacturing-hub/oid/pkg/oid/100_managementConsole/100_certificates"
 	"github.com/united-manufacturing-hub/yCrypt/pkg/encoding"
@@ -105,6 +106,22 @@ func GenerateFakeUserOrDeviceCertificate(ca *x509.Certificate, caPrivKey *rsa.Pr
 		cn = "UMH-TEST-USER-DO-NOT-USE"
 	}
 
+	var csrExtensions []pkix.Extension
+	if isDeviceCertificate {
+		csrExtensions = []pkix.Extension{
+			oid.ToPkixExtension(
+				certificates.GetDeviceCertificateAsn10id(),
+				true,
+				[]byte{0x01})}
+
+	} else {
+		csrExtensions = []pkix.Extension{
+			oid.ToPkixExtension(
+				certificates.GetTechCertificateAsn10id(),
+				true,
+				[]byte{0x01})}
+	}
+
 	certificateRequest, err = GenerateCSR(
 		userPrivKey, &pkix.Name{
 			Country:            []string{"DE"},
@@ -115,18 +132,7 @@ func GenerateFakeUserOrDeviceCertificate(ca *x509.Certificate, caPrivKey *rsa.Pr
 			StreetAddress:      []string{"Vaalser Straße 460"},
 			PostalCode:         []string{"52074"},
 			CommonName:         cn,
-		})
-
-	if isDeviceCertificate {
-		certificateRequest.Extensions = append(
-			certificateRequest.Extensions,
-			oid.ToPkixExtension(certificates.GetDeviceCertificateAsn10id(), true, []byte{0x01}))
-
-	} else {
-		certificateRequest.Extensions = append(
-			certificateRequest.Extensions,
-			oid.ToPkixExtension(certificates.GetTechCertificateAsn10id(), true, []byte{0x01}))
-	}
+		}, csrExtensions)
 
 	if err != nil {
 		return nil, nil, err
@@ -198,10 +204,16 @@ func GenerateSelfSignedCertificate(
 }
 
 // GenerateCSR generates a certificate signing request
-func GenerateCSR(privateKey *rsa.PrivateKey, subject *pkix.Name) (csr *x509.CertificateRequest, err error) {
+func GenerateCSR(
+	privateKey *rsa.PrivateKey,
+	subject *pkix.Name,
+	extension []pkix.Extension) (csr *x509.CertificateRequest, err error) {
 	template := x509.CertificateRequest{
-		Subject: *subject,
+		Subject:         *subject,
+		ExtraExtensions: extension,
 	}
+
+	fmt.Println("template", template)
 
 	csrBytes, err := x509.CreateCertificateRequest(rand.Reader, &template, privateKey)
 	if err != nil {
@@ -212,6 +224,9 @@ func GenerateCSR(privateKey *rsa.PrivateKey, subject *pkix.Name) (csr *x509.Cert
 	if err != nil {
 		return csr, err
 	}
+
+	fmt.Println("csr", csr.Extensions)
+
 	err = csr.CheckSignature()
 	return csr, err
 }
@@ -250,6 +265,7 @@ func SignCSR(
 		IsCA:                  isIntermediateCA,
 		BasicConstraintsValid: true,
 		AuthorityKeyId:        caCert.SubjectKeyId,
+		ExtraExtensions:       csr.Extensions,
 	}
 	if isIntermediateCA {
 		certificate.KeyUsage |= x509.KeyUsageCertSign

@@ -13,7 +13,7 @@ import (
 )
 
 func TestVerifyPKI(t *testing.T) {
-	caCert, caPrivKey, certBundle, err := rsagen.GenerateFakeCAAndCertificates(2)
+	caCert, caPrivKey, certBundle, err := rsagen.GenerateFakeCAAndCertificates(5)
 	if err != nil {
 		return
 	}
