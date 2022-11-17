@@ -2,8 +2,6 @@
 
 yCrypt is a simple encryption, decryption & signing package for go.
 
-Expect breaking changes until v1.0.0.
-
 
 ## Contributing
 
