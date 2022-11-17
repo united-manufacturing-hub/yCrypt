@@ -29,4 +29,4 @@ Make sure to install the pre-push hooks.
 
 ## Notes
 
-PKCS1v15 will be replaced with OAEP in the future.
+PKCS1v15 will be replaced with OAEP in the future. (This will be a breaking change (and therefore a major version bump)).
