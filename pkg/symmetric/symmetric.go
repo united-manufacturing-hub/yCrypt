@@ -88,7 +88,7 @@ func SignCompressEncrypt(
 		}
 
 	default:
-		return EncryptedData{}, errdef.ErrorUnknownPublicKeyType
+		return EncryptedData{}, errdef.ErrorUnknownPublicKeyAlgorithm
 	}
 
 	return EncryptedData{
@@ -168,7 +168,7 @@ func DecryptDecompressVerify(
 		return nil, err
 	}
 	if len(ciphertext.Ciphertext) < aead.NonceSize() {
-		return nil, errdef.ErrorCipherTextToShort
+		return nil, errdef.ErrorCipherTextTooShort
 	}
 	nonce := ciphertext.Ciphertext[:aead.NonceSize()]
 	plaintext, err := aead.Open(nil, nonce, ciphertext.Ciphertext[aead.NonceSize():], nil)

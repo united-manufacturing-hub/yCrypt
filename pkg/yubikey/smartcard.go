@@ -15,6 +15,8 @@ import (
 var ykHandleMap = make(map[uint32]*ThreadSafeYubikey)
 var ykHandleMapMutex = &sync.RWMutex{}
 
+// getOrOpenPIVBySerial returns a ThreadSafeYubikey pointer for the given serial number
+// If the Yubikey was not opened before, it will be opened and added to the global map
 func getOrOpenPIVBySerial(serial uint32, name string) (*ThreadSafeYubikey, error) {
 	ykHandleMapMutex.Lock()
 	defer ykHandleMapMutex.Unlock()
@@ -60,17 +62,20 @@ var smartCardList []SmartCard
 var smartCardListRWLock = &sync.RWMutex{}
 var smartCardListRunOnce = &onceReset{}
 
+// onceReset is a resettable once
 type onceReset struct {
 	done uint32
 	m    sync.Mutex
 }
 
+// do checks if the once was executed and if not, calls doSlow with the once function
 func (o *onceReset) do(f func()) {
 	if atomic.LoadUint32(&o.done) == 0 {
 		o.doSlow(f)
 	}
 }
 
+// doSlow sets once to done and calls the once function
 func (o *onceReset) doSlow(f func()) {
 	o.m.Lock()
 	defer o.m.Unlock()
@@ -80,12 +85,14 @@ func (o *onceReset) doSlow(f func()) {
 	}
 }
 
+// reset resets the once
 func (o *onceReset) reset() {
 	o.m.Lock()
 	defer o.m.Unlock()
 	atomic.StoreUint32(&o.done, 0)
 }
 
+// RefreshSmartCards resets the smart card list
 func RefreshSmartCards() {
 	smartCardListRunOnce.reset()
 	GetValidSmartCards(nil)
@@ -255,6 +262,7 @@ func (c *SmartCard) ImportCertificate(slot piv.Slot, cert *x509.Certificate) err
 	return err
 }
 
+// GetAttestation returns the attestation certificate of the YubiKey
 func (c *SmartCard) GetAttestation(toVerify piv.Slot) (attestation *piv.Attestation, err error) {
 	yKey, err := c.GetYKHandle()
 	if err != nil {
@@ -283,7 +291,7 @@ func (c *SmartCard) GetAttestation(toVerify piv.Slot) (attestation *piv.Attestat
 		case extIDSerialNumber.String():
 			var serial int64
 			if _, err = asn1.Unmarshal(e.Value, &serial); err != nil {
-				return nil, errdef.ErrorSerialNumberParsing
+				return nil, errdef.ErrorSerialNumberIsNotAsn1
 			}
 			if serial < 0 {
 				return nil, errdef.ErrorSerialNumberNegative

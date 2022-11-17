@@ -54,6 +54,8 @@ func VerifyPKI(
 	return len(verify) > 0, nil
 }
 
+// removeAllCriticalExtensions removes all critical extensions from the certificate.
+// This is used to allow the certificate to be verified by the standard library.
 func removeAllowedCriticalExtensions(
 	cert *x509.Certificate,
 	allowedExtensions []asn1.ObjectIdentifier) {

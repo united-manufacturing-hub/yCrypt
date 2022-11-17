@@ -40,7 +40,7 @@ func Sign(signer pkg.KeyOrCardInterface, data *[]byte) (rsa.PublicKey, []byte, e
 	case *rsa.PublicKey:
 		return rsa.PublicKey{}, nil, errdef.ErrorPublicKeyIsNotASigner
 	default:
-		return rsa.PublicKey{}, nil, errdef.ErrorUnknownPrivateKeyType
+		return rsa.PublicKey{}, nil, errdef.ErrorUnknownPrivateKeyAlgorithm
 	}
 }
 
@@ -98,7 +98,7 @@ func signWithYubikey(smartCard *yubikey.SmartCard, slot piv.Slot, data *[]byte, 
 		}
 		return signature, nil
 	default:
-		return nil, errdef.ErrorUnknownPublicKeyType
+		return nil, errdef.ErrorUnknownPublicKeyAlgorithm
 	}
 }
 
@@ -133,7 +133,7 @@ func VerifySigned(validator pkg.KeyOrCardInterface, data, signature []byte) erro
 	case *x509.Certificate:
 		return verifySignedWithCertificate(t, data, signature)
 	}
-	return errdef.ErrorUnknownValidatorType
+	return errdef.ErrorUnknownValidatorAlgorithm
 }
 
 // verifySignedWithYubiKey verifies the signature of the data with a yubikey.
@@ -162,7 +162,7 @@ func verifySignedWithCertificate(certificate *x509.Certificate, data, signature 
 			return err
 		}
 	default:
-		return errdef.ErrorUnknownPublicKeyType
+		return errdef.ErrorUnknownPublicKeyAlgorithm
 	}
 	return nil
 }

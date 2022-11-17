@@ -14,6 +14,7 @@ import (
 	"time"
 )
 
+// CertKeyBundle is a struct containing a certificate and its private key
 type CertKeyBundle struct {
 	Certificate *x509.Certificate
 	PrivateKey  *rsa.PrivateKey
