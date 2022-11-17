@@ -3,8 +3,8 @@ package yubikey
 import (
 	"crypto"
 	"crypto/x509"
-	"errors"
 	"github.com/go-piv/piv-go/piv"
+	"github.com/united-manufacturing-hub/yCrypt/pkg/errdef"
 	"sync"
 )
 
@@ -29,7 +29,7 @@ func (y *ThreadSafeYubikey) AttestationCertificate() (*x509.Certificate, error) 
 	y.lock.Lock()
 	defer y.lock.Unlock()
 	if !y.open {
-		return nil, errors.New("yubikey not open")
+		return nil, errdef.ErrorYubikeyNotOpen
 	}
 	return y.yubikey.AttestationCertificate()
 }
@@ -37,15 +37,16 @@ func (y *ThreadSafeYubikey) Attest(slot piv.Slot) (*x509.Certificate, error) {
 	y.lock.Lock()
 	defer y.lock.Unlock()
 	if !y.open {
-		return nil, errors.New("yubikey not open")
+		return nil, errdef.ErrorYubikeyNotOpen
 	}
 	return y.yubikey.Attest(slot)
 }
+
 func (y *ThreadSafeYubikey) Certificate(slot piv.Slot) (*x509.Certificate, error) {
 	y.lock.Lock()
 	defer y.lock.Unlock()
 	if !y.open {
-		return nil, errors.New("yubikey not open")
+		return nil, errdef.ErrorYubikeyNotOpen
 	}
 	return y.yubikey.Certificate(slot)
 }
@@ -53,7 +54,7 @@ func (y *ThreadSafeYubikey) SetCertificate(key [24]byte, slot piv.Slot, cert *x5
 	y.lock.Lock()
 	defer y.lock.Unlock()
 	if !y.open {
-		return errors.New("yubikey not open")
+		return errdef.ErrorYubikeyNotOpen
 	}
 	return y.yubikey.SetCertificate(key, slot, cert)
 }
@@ -61,7 +62,7 @@ func (y *ThreadSafeYubikey) GenerateKey(key [24]byte, slot piv.Slot, opts piv.Ke
 	y.lock.Lock()
 	defer y.lock.Unlock()
 	if !y.open {
-		return nil, errors.New("yubikey not open")
+		return nil, errdef.ErrorYubikeyNotOpen
 	}
 	return y.yubikey.GenerateKey(key, slot, opts)
 }
@@ -71,7 +72,7 @@ func (y *ThreadSafeYubikey) PrivateKey(slot piv.Slot, public crypto.PublicKey, a
 	y.lock.Lock()
 	defer y.lock.Unlock()
 	if !y.open {
-		return nil, errors.New("yubikey not open")
+		return nil, errdef.ErrorYubikeyNotOpen
 	}
 	return y.yubikey.PrivateKey(slot, public, auth)
 }
@@ -83,7 +84,7 @@ func (y *ThreadSafeYubikey) SetPrivateKeyInsecure(
 	y.lock.Lock()
 	defer y.lock.Unlock()
 	if !y.open {
-		return errors.New("yubikey not open")
+		return errdef.ErrorYubikeyNotOpen
 	}
 	return y.yubikey.SetPrivateKeyInsecure(key, slot, private, policy)
 }
@@ -103,7 +104,7 @@ func (y *ThreadSafeYubikey) Serial() (uint32, error) {
 	y.lock.Lock()
 	defer y.lock.Unlock()
 	if !y.open {
-		return 0, errors.New("yubikey not open")
+		return 0, errdef.ErrorYubikeyNotOpen
 	}
 	return y.yubikey.Serial()
 }
@@ -111,7 +112,7 @@ func (y *ThreadSafeYubikey) Retries() (int, error) {
 	y.lock.Lock()
 	defer y.lock.Unlock()
 	if !y.open {
-		return 0, errors.New("yubikey not open")
+		return 0, errdef.ErrorYubikeyNotOpen
 	}
 	return y.yubikey.Retries()
 }
@@ -119,7 +120,7 @@ func (y *ThreadSafeYubikey) Reset() error {
 	y.lock.Lock()
 	defer y.lock.Unlock()
 	if !y.open {
-		return errors.New("yubikey not open")
+		return errdef.ErrorYubikeyNotOpen
 	}
 	return y.yubikey.Reset()
 }
@@ -127,7 +128,7 @@ func (y *ThreadSafeYubikey) SetManagementKey(oldKey, newKey [24]byte) error {
 	y.lock.Lock()
 	defer y.lock.Unlock()
 	if !y.open {
-		return errors.New("yubikey not open")
+		return errdef.ErrorYubikeyNotOpen
 	}
 	return y.yubikey.SetManagementKey(oldKey, newKey)
 }
@@ -135,7 +136,7 @@ func (y *ThreadSafeYubikey) SetPIN(oldPIN, newPIN string) error {
 	y.lock.Lock()
 	defer y.lock.Unlock()
 	if !y.open {
-		return errors.New("yubikey not open")
+		return errdef.ErrorYubikeyNotOpen
 	}
 	return y.yubikey.SetPIN(oldPIN, newPIN)
 }
@@ -143,7 +144,7 @@ func (y *ThreadSafeYubikey) Unblock(puk, newPIN string) error {
 	y.lock.Lock()
 	defer y.lock.Unlock()
 	if !y.open {
-		return errors.New("yubikey not open")
+		return errdef.ErrorYubikeyNotOpen
 	}
 	return y.yubikey.Unblock(puk, newPIN)
 }
@@ -151,7 +152,7 @@ func (y *ThreadSafeYubikey) SetPUK(oldPUK, newPUK string) error {
 	y.lock.Lock()
 	defer y.lock.Unlock()
 	if !y.open {
-		return errors.New("yubikey not open")
+		return errdef.ErrorYubikeyNotOpen
 	}
 	return y.yubikey.SetPUK(oldPUK, newPUK)
 }
@@ -159,7 +160,7 @@ func (y *ThreadSafeYubikey) Metadata(pin string) (*piv.Metadata, error) {
 	y.lock.Lock()
 	defer y.lock.Unlock()
 	if !y.open {
-		return nil, errors.New("yubikey not open")
+		return nil, errdef.ErrorYubikeyNotOpen
 	}
 	return y.yubikey.Metadata(pin)
 }
@@ -167,7 +168,7 @@ func (y *ThreadSafeYubikey) SetMetadata(key [24]byte, m *piv.Metadata) error {
 	y.lock.Lock()
 	defer y.lock.Unlock()
 	if !y.open {
-		return errors.New("yubikey not open")
+		return errdef.ErrorYubikeyNotOpen
 	}
 	return y.yubikey.SetMetadata(key, m)
 }

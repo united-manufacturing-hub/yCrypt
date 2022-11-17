@@ -5,11 +5,10 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"errors"
-	"fmt"
 	"github.com/united-manufacturing-hub/oid/pkg/oid"
 	certificates "github.com/united-manufacturing-hub/oid/pkg/oid/100_managementConsole/100_certificates"
 	"github.com/united-manufacturing-hub/yCrypt/pkg/encoding"
+	"github.com/united-manufacturing-hub/yCrypt/pkg/errdef"
 	"math/big"
 	"sync"
 	"time"
@@ -195,7 +194,7 @@ func GenerateSelfSignedCertificate(
 		return cert, key, err
 	}
 	if len(caCertificates) != 1 {
-		return cert, key, errors.New("len(caCertificates) != 1")
+		return cert, key, errdef.ErrorPEMContainedNotExactlyOneKey
 	}
 
 	cert = caCertificates[0]
@@ -213,8 +212,6 @@ func GenerateCSR(
 		ExtraExtensions: extension,
 	}
 
-	fmt.Println("template", template)
-
 	csrBytes, err := x509.CreateCertificateRequest(rand.Reader, &template, privateKey)
 	if err != nil {
 		return csr, err
@@ -224,8 +221,6 @@ func GenerateCSR(
 	if err != nil {
 		return csr, err
 	}
-
-	fmt.Println("csr", csr.Extensions)
 
 	err = csr.CheckSignature()
 	return csr, err
@@ -284,7 +279,7 @@ func SignCSR(
 		return cert, err
 	}
 	if len(certs) != 1 {
-		return cert, errors.New("len(certs) != 1")
+		return cert, errdef.ErrorPEMContainedNotExactlyOneKey
 	}
 
 	cert = certs[0]

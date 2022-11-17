@@ -3,8 +3,8 @@ package yubikey
 import (
 	"crypto/x509"
 	"encoding/asn1"
-	"fmt"
 	"github.com/go-piv/piv-go/piv"
+	"github.com/united-manufacturing-hub/yCrypt/pkg/errdef"
 	"go.uber.org/zap"
 	"sort"
 	"strings"
@@ -196,7 +196,7 @@ func (c *SmartCard) GetPublicKey(slot piv.Slot) (publicKey any, err error) {
 		return nil, err
 	}
 	if certificate == nil {
-		return nil, fmt.Errorf("no certificate found on slot %d", slot)
+		return nil, errdef.ErrorNoCertificateInSlot
 	}
 
 	return certificate.PublicKey, nil
@@ -273,7 +273,7 @@ func (c *SmartCard) GetAttestation(toVerify piv.Slot) (attestation *piv.Attestat
 		switch e.Id.String() {
 		case extIDFirmwareVersion.String():
 			if len(e.Value) != 3 {
-				return nil, fmt.Errorf("expected 3 bytes for firmware version, got: %d", len(e.Value))
+				return nil, errdef.ErrorUnexpectedFWVersionBytes
 			}
 			attestation.Version = piv.Version{
 				Major: int(e.Value[0]),
@@ -283,15 +283,15 @@ func (c *SmartCard) GetAttestation(toVerify piv.Slot) (attestation *piv.Attestat
 		case extIDSerialNumber.String():
 			var serial int64
 			if _, err = asn1.Unmarshal(e.Value, &serial); err != nil {
-				return nil, fmt.Errorf("parsing serial number: %w", err)
+				return nil, errdef.ErrorSerialNumberParsing
 			}
 			if serial < 0 {
-				return nil, fmt.Errorf("serial number was negative: %d", serial)
+				return nil, errdef.ErrorSerialNumberNegative
 			}
 			attestation.Serial = uint32(serial)
 		case extIDKeyPolicy.String():
 			if len(e.Value) != 2 {
-				return nil, fmt.Errorf("expected 2 bytes from key policy, got: %d", len(e.Value))
+				return nil, errdef.ErrUnexpectedKeyPolicyByteLen
 			}
 			switch e.Value[0] {
 			case 0x01:
@@ -301,7 +301,7 @@ func (c *SmartCard) GetAttestation(toVerify piv.Slot) (attestation *piv.Attestat
 			case 0x03:
 				attestation.PINPolicy = piv.PINPolicyAlways
 			default:
-				return nil, fmt.Errorf("unrecognized pin policy: 0x%x", e.Value[0])
+				return nil, errdef.ErrUnrecognizedPinPolicy
 			}
 			switch e.Value[1] {
 			case 0x01:
@@ -311,12 +311,12 @@ func (c *SmartCard) GetAttestation(toVerify piv.Slot) (attestation *piv.Attestat
 			case 0x03:
 				attestation.TouchPolicy = piv.TouchPolicyCached
 			default:
-				return nil, fmt.Errorf("unrecognized touch policy: 0x%x", e.Value[1])
+				return nil, errdef.ErrorUnrecognizedTouchPolicy
 			}
 		case extIDFormFactor.String():
 
 			if len(e.Value) != 1 {
-				return nil, fmt.Errorf("expected 1 byte from formfactor, got: %d", len(e.Value))
+				return nil, errdef.ErrorIncorrectFormFactorBytes
 			}
 			attestation.Formfactor = piv.Formfactor(e.Value[0])
 		}

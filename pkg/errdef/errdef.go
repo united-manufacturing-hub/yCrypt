@@ -1,0 +1,30 @@
+package errdef
+
+import errwrap "github.com/united-manufacturing-hub/errWrap/pkg"
+
+const (
+	ErrorYubikeyNotOpen               = errwrap.ConstError("yubikey not open")
+	ErrorNoCertificateInSlot          = errwrap.ConstError("no certificate in slot")
+	ErrorIncorrectFormFactorBytes     = errwrap.ConstError("incorrect form factor bytes")
+	ErrorUnrecognizedTouchPolicy      = errwrap.ConstError("unrecognized touch policy")
+	ErrUnrecognizedPinPolicy          = errwrap.ConstError("unrecognized pin policy")
+	ErrUnexpectedKeyPolicyByteLen     = errwrap.ConstError("unexpected key policy byte length")
+	ErrorSerialNumberNegative         = errwrap.ConstError("serial number negative")
+	ErrorSerialNumberParsing          = errwrap.ConstError("failed to parse serial number")
+	ErrorUnexpectedFWVersionBytes     = errwrap.ConstError("unexpected firmware version bytes")
+	ErrorCipherTextToShort            = errwrap.ConstError("ciphertext too short")
+	ErrorSessionKeySizeInvalid        = errwrap.ConstError("session key size invalid")
+	ErrorUnknownPublicKeyType         = errwrap.ConstError("unknown public key type")
+	ErrorLockedBufferIsNil            = errwrap.ConstError("locked buffer is nil")
+	ErrorSessionKeyIsNil              = errwrap.ConstError("session key is nil")
+	ErrorUnknownValidatorType         = errwrap.ConstError("unknown validation type")
+	ErrorSignatureIsEmpty             = errwrap.ConstError("signature is nil")
+	ErrorPublicKeyIsNotRSA            = errwrap.ConstError("public key is not RSA")
+	ErrorDataIsEmpty                  = errwrap.ConstError("data is empty")
+	ErrorPrivateKeyIsNotASigner       = errwrap.ConstError("private key is not a signer")
+	ErrorPublicKeyIsNotASigner        = errwrap.ConstError("public key is not a signer")
+	ErrorUnknownPrivateKeyType        = errwrap.ConstError("unknown private key type")
+	ErrorPEMContainedNotExactlyOneKey = errwrap.ConstError("PEM contained not exactly one key")
+	ErrorDERIsEmpty                   = errwrap.ConstError("DER is empty")
+	ErrorRestIsNotEmpty               = errwrap.ConstError("rest is not zero")
+)

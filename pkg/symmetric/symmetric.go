@@ -6,11 +6,10 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"errors"
-	"fmt"
 	"github.com/awnumar/memguard"
 	"github.com/united-manufacturing-hub/yCrypt/pkg"
 	"github.com/united-manufacturing-hub/yCrypt/pkg/compress"
+	"github.com/united-manufacturing-hub/yCrypt/pkg/errdef"
 	"github.com/united-manufacturing-hub/yCrypt/pkg/signature"
 	"github.com/united-manufacturing-hub/yCrypt/pkg/yubikey"
 	"golang.org/x/crypto/chacha20poly1305"
@@ -44,7 +43,7 @@ func SignCompressEncrypt(
 	sessionKey := memguard.NewEnclaveRandom(chacha20poly1305.KeySize)
 
 	if sessionKey == nil {
-		return EncryptedData{}, errors.New("sessionKey is nil")
+		return EncryptedData{}, errdef.ErrorSessionKeyIsNil
 	}
 
 	var lockedBuffer *memguard.LockedBuffer
@@ -53,7 +52,7 @@ func SignCompressEncrypt(
 		return EncryptedData{}, err
 	}
 	if lockedBuffer == nil {
-		return EncryptedData{}, errors.New("lockedBuffer is nil")
+		return EncryptedData{}, errdef.ErrorLockedBufferIsNil
 	}
 	defer lockedBuffer.Destroy()
 
@@ -89,7 +88,7 @@ func SignCompressEncrypt(
 		}
 
 	default:
-		return EncryptedData{}, fmt.Errorf("unknown public key type %T", t)
+		return EncryptedData{}, errdef.ErrorUnknownPublicKeyType
 	}
 
 	return EncryptedData{
@@ -105,7 +104,6 @@ func SignCompressEncrypt(
 func encryptSessionKeyUsingRSA(pubKey *rsa.PublicKey, sessionKey []byte) (
 	encryptedSessionKey []byte,
 	err error) {
-	//TODO: use OAEP
 
 	encryptedSessionKey, err = rsa.EncryptPKCS1v15(rand.Reader, pubKey, sessionKey)
 
@@ -158,10 +156,9 @@ func DecryptDecompressVerify(
 			return nil, err
 		}
 	}
-	fmt.Printf("sessionKey: %x, len: %d\n", sessionKey, len(sessionKey))
 
 	if len(sessionKey) != chacha20poly1305.KeySize {
-		return nil, fmt.Errorf("session key has wrong size: %d", len(sessionKey))
+		return nil, errdef.ErrorSessionKeySizeInvalid
 	}
 
 	// Decrypt data using XChaCha20-Poly1305
@@ -171,7 +168,7 @@ func DecryptDecompressVerify(
 		return nil, err
 	}
 	if len(ciphertext.Ciphertext) < aead.NonceSize() {
-		return nil, errors.New("ciphertext too short")
+		return nil, errdef.ErrorCipherTextToShort
 	}
 	nonce := ciphertext.Ciphertext[:aead.NonceSize()]
 	plaintext, err := aead.Open(nil, nonce, ciphertext.Ciphertext[aead.NonceSize():], nil)
@@ -197,7 +194,6 @@ func DecryptDecompressVerify(
 func decryptSessionKeyUsingRSA(encryptedSessionKey []byte, decrypter *rsa.PrivateKey) (
 	sessionKey []byte,
 	err error) {
-	//TODO: use OAEP
 	sessionKey, err = rsa.DecryptPKCS1v15(rand.Reader, decrypter, encryptedSessionKey)
 
 	return sessionKey, err
@@ -207,7 +203,6 @@ func decryptSessionKeyUsingRSA(encryptedSessionKey []byte, decrypter *rsa.Privat
 func decryptSessionKeyUsingRSAYK(encryptedSessionKey []byte, decrypter crypto.Decrypter) (
 	sessionKey []byte,
 	err error) {
-	//TODO: use OAEP
 	sessionKey, err = decrypter.Decrypt(
 		nil,
 		encryptedSessionKey,

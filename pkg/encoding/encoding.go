@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"crypto/x509"
 	"encoding/pem"
-	"errors"
+	"github.com/united-manufacturing-hub/yCrypt/pkg/errdef"
 )
 
 // EncodeCertificateToPEM encodes a certificate to PEM format.
@@ -39,10 +39,10 @@ func CertBytesToX509Certificate(certBytes []byte) (cert []*x509.Certificate, err
 	var rest []byte
 	derCert, rest = pem.Decode(certificateToPEM)
 	if len(rest) > 0 {
-		return nil, errors.New("rest not empty")
+		return nil, errdef.ErrorRestIsNotEmpty
 	}
 	if derCert == nil {
-		return nil, errors.New("derCert is nil")
+		return nil, errdef.ErrorDERIsEmpty
 	}
 	cert, err = x509.ParseCertificates(derCert.Bytes)
 	return cert, err

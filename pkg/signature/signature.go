@@ -5,9 +5,9 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"fmt"
 	"github.com/go-piv/piv-go/piv"
 	"github.com/united-manufacturing-hub/yCrypt/pkg"
+	"github.com/united-manufacturing-hub/yCrypt/pkg/errdef"
 	"github.com/united-manufacturing-hub/yCrypt/pkg/yubikey"
 	_ "golang.org/x/crypto/sha3"
 )
@@ -38,9 +38,9 @@ func Sign(signer pkg.KeyOrCardInterface, data *[]byte) (rsa.PublicKey, []byte, e
 		}
 		return t.PublicKey, sig, nil
 	case *rsa.PublicKey:
-		return rsa.PublicKey{}, nil, fmt.Errorf("public key is not a signer")
+		return rsa.PublicKey{}, nil, errdef.ErrorPublicKeyIsNotASigner
 	default:
-		return rsa.PublicKey{}, nil, fmt.Errorf("unknown signer type: %T", signer)
+		return rsa.PublicKey{}, nil, errdef.ErrorUnknownPrivateKeyType
 	}
 }
 
@@ -67,13 +67,13 @@ func signWithYubikey(smartCard *yubikey.SmartCard, slot piv.Slot, data *[]byte, 
 	}
 	signer, ok := priv.(crypto.Signer)
 	if !ok {
-		return nil, fmt.Errorf("private key is not a signer")
+		return nil, errdef.ErrorPrivateKeyIsNotASigner
 	}
 
 	switch signer.Public().(type) {
 	case *rsa.PublicKey:
 		if len(*data) == 0 {
-			return nil, fmt.Errorf("data is empty")
+			return nil, errdef.ErrorDataIsEmpty
 		}
 
 		hashB := SignerHash.New()
@@ -83,7 +83,7 @@ func signWithYubikey(smartCard *yubikey.SmartCard, slot piv.Slot, data *[]byte, 
 		var rsaPubKey *rsa.PublicKey
 		rsaPubKey, ok = signer.Public().(*rsa.PublicKey)
 		if !ok {
-			return nil, fmt.Errorf("public key is not RSA")
+			return nil, errdef.ErrorPublicKeyIsNotRSA
 		}
 		signature, err = signer.Sign(rand.Reader, hashSumB, SignerHash)
 		if err != nil {
@@ -94,11 +94,11 @@ func signWithYubikey(smartCard *yubikey.SmartCard, slot piv.Slot, data *[]byte, 
 			return nil, err
 		}
 		if len(signature) == 0 {
-			return nil, fmt.Errorf("signature is empty")
+			return nil, errdef.ErrorSignatureIsEmpty
 		}
 		return signature, nil
 	default:
-		return nil, fmt.Errorf("unknown key type")
+		return nil, errdef.ErrorUnknownPublicKeyType
 	}
 }
 
@@ -120,7 +120,7 @@ func signWithPrivateKey(privKey *rsa.PrivateKey, data *[]byte) (
 		return nil, err
 	}
 	if len(signature) == 0 {
-		return nil, fmt.Errorf("signature is empty")
+		return nil, errdef.ErrorSignatureIsEmpty
 	}
 	return signature, nil
 }
@@ -133,17 +133,15 @@ func VerifySigned(validator pkg.KeyOrCardInterface, data, signature []byte) erro
 	case *x509.Certificate:
 		return verifySignedWithCertificate(t, data, signature)
 	}
-	return fmt.Errorf("unknown validator type: %T", validator)
+	return errdef.ErrorUnknownValidatorType
 }
 
 // verifySignedWithYubiKey verifies the signature of the data with a yubikey.
 func verifySignedWithYubiKey(card *yubikey.SmartCard, slot piv.Slot, data, signature []byte) error {
-	fmt.Printf("Retrieving certificate from slot %v\n", slot)
 	certificate, err := card.GetCertificate(slot)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Verifying certificate for %v\n", signature)
 	err = verifySignedWithCertificate(certificate, data, signature)
 	if err != nil {
 		return err
@@ -164,7 +162,7 @@ func verifySignedWithCertificate(certificate *x509.Certificate, data, signature 
 			return err
 		}
 	default:
-		return fmt.Errorf("unknown key type")
+		return errdef.ErrorUnknownPublicKeyType
 	}
 	return nil
 }

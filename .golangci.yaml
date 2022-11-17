@@ -51,6 +51,7 @@ linters-settings:
       - net
       - math/rand
       - github.com/united-manufacturing-hub/oid/**/*
+      - github.com/united-manufacturing-hub/errWrap/pkg
 
 
   errcheck:
@@ -200,9 +201,6 @@ linters:
   # https://golangci-lint.run/usage/linters/#enabled-by-default-linters
   enable:
     - asciicheck
-    - govet
-    - makezero
-    - prealloc
     - bidichk
     - bodyclose
     - containedctx
@@ -215,21 +213,29 @@ linters:
     - errchkjson
     - errorlint
     - exhaustive
-    - gocognit
     - goconst
     - gocritic
-    - gocyclo
+    - godox
+    - goerr113
     - gosec
-    - ifshort
-    - lll
+    - govet
+    - loggercheck
     - maintidx
+    - makezero
     - misspell
     - nakedret
     - nestif
+    - nilerr
     - noctx
+    - prealloc
     - predeclared
+    - tagliatelle
     - tenv
+    - tenv
+    - unconvert
     - unparam
+    - unparam
+    - usestdlibvars
 
 
 issues:
